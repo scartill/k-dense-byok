@@ -17,8 +17,26 @@ function readAppVersion(): string {
   return "0.0.0";
 }
 
+// Allow Next.js dev resources (HMR, _next assets) to be served to remote
+// hosts such as an ngrok tunnel. Set ALLOWED_DEV_ORIGINS to a comma-separated
+// list of hostnames (no scheme) to permit additional origins in dev.
+const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
+  .split(",")
+  .map((h) => h.trim())
+  .filter(Boolean);
+
+// When the UI is reached through a remote origin (e.g. an ngrok tunnel), the
+// browser cannot talk to the backend's own localhost:8000 — "localhost" there
+// means the *viewer's* machine. Instead the UI calls a same-origin path
+// (NEXT_PUBLIC_ADK_API_URL=https://<host>/kady-api) and a route handler
+// (src/app/kady-api/[...path]/route.ts) proxies it, server-side over
+// loopback, to the real backend. That handler strips the browser's Origin /
+// Referer / Sec-Fetch-* headers so the backend sees an origin-less loopback
+// request and its CORS + DNS-rebinding guards pass without being weakened.
+
 const nextConfig: NextConfig = {
   devIndicators: false,
+  ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
   async headers() {
     return [{ source: "/office/:path*", headers: [
       { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
